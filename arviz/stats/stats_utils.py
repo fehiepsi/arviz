@@ -3,15 +3,39 @@ from collections.abc import Sequence
 import warnings
 
 import numpy as np
-from scipy.signal import fftconvolve
+from scipy.fft import next_fast_len
 from scipy.stats.mstats import mquantiles
 from xarray import apply_ufunc
 
 
-__all__ = ["autocorr", "make_ufunc", "wrap_xarray_ufunc"]
+__all__ = ["autocorr", "autocov", "make_ufunc", "wrap_xarray_ufunc"]
 
 
-def autocorr(ary):
+def autocov(ary, axis=-1):
+    """Compute autocovariance estimates for every lag for the input array.
+
+    Parameters
+    ----------
+    ary : Numpy array
+        An array containing MCMC samples
+
+    Returns
+    -------
+    acov: Numpy array same size as the input array
+    """
+    n = ary.shape[axis]
+    m = next_fast_len(n)
+
+    ifft_ary = np.fft.rfft(ary - ary.mean(axis, keepdims=True), n=m, axis=axis)
+    ifft_ary *= np.conjugate(ifft_ary)
+
+    cov = np.fft.irfft(ifft_ary, n=n, axis=axis)
+    cov /= n
+
+    return cov
+
+
+def autocorr(ary, axis=-1):
     """Compute autocorrelation using FFT for every lag for the input array.
 
     See https://en.wikipedia.org/wiki/autocorrelation#Efficient_computation
@@ -25,36 +49,14 @@ def autocorr(ary):
     -------
     acorr: Numpy array same size as the input array
     """
-    ary = ary - ary.mean()
-    n = len(ary)
-    with warnings.catch_warnings():
-        # silence annoying numpy tuple warning in another library
-        # silence hack added in 0.3.3+
-        warnings.simplefilter("ignore")
-        result = fftconvolve(ary, ary[::-1])
-    acorr = result[len(result) // 2 :]
-    acorr /= np.arange(n, 0, -1)
+    corr = autocov(ary, axis=axis)
+    axis = len(corr.shape) + axis if axis < 0 else axis
+    norm = tuple(
+        slice(None, None) if dim != axis else slice(None, 1) for dim, _ in enumerate(corr.shape)
+    )
     with np.errstate(invalid="ignore"):
-        acorr /= acorr[0]
-    return acorr
-
-
-def _autocov(ary):
-    """Compute autocovariance estimates for every lag for the input array.
-
-    Parameters
-    ----------
-    ary : Numpy array
-        An array containing MCMC samples
-
-    Returns
-    -------
-    acov: Numpy array same size as the input array
-    """
-    acorr = autocorr(ary)
-    varx = np.var(ary, ddof=0)
-    acov = acorr * varx
-    return acov
+        corr /= corr[norm]
+    return corr
 
 
 def make_ufunc(func, n_dims=2, n_output=1, index=Ellipsis, ravel=True):  # noqa: D202

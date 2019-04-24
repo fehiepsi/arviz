@@ -19,4 +19,5 @@ __all__ = [
     "mcse",
     "geweke",
     "autocorr",
+    "autocov",
 ]

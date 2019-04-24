@@ -8,10 +8,10 @@ import pandas as pd
 from scipy import stats
 
 from .stats_utils import (
-    _autocov,
     _rint,
     _round,
     _quantile,
+    autocov,
     check_valid_size as _check_valid_size,
     check_nan as _check_nan,
     wrap_xarray_ufunc as _wrap_xarray_ufunc,
@@ -519,7 +519,7 @@ def _ess(ary, split=False):
     if split:
         ary = _split_chains(ary)
     n_chain, n_draw = ary.shape
-    acov = np.asarray([_autocov(ary[chain]) for chain in range(n_chain)])
+    acov = autocov(ary, axis=1)
     chain_mean = ary.mean(axis=1)
     mean_var = np.mean(acov[:, 0]) * n_draw / (n_draw - 1.0)
     var_plus = mean_var * (n_draw - 1.0) / n_draw
