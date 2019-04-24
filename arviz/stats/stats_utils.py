@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import warnings
 
 import numpy as np
-from scipy.fft import next_fast_len
+from scipy.fftpack import next_fast_len
 from scipy.stats.mstats import mquantiles
 from xarray import apply_ufunc
 
